@@ -1,0 +1,234 @@
+<html><head><base href="https://heuressupp.app/%20prendre%20en%20compte%20les%20jours%20du%20mois%20pr%C3%A9c%C3%A9dent%20sur%20la%20derni%C3%A8re%20semaine,%20y%20comprit%20pour%20le%20r%C3%A9sum%C3%A9%20et%20total">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suivi des Heures Supplémentaires - Version Améliorée</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .calendar {
+            flex: 1;
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-right: 20px;
+        }
+        .summary {
+            flex: 0 0 300px;
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .prev-month, .next-month {
+            color: #999;
+        }
+        input[type="number"] {
+            width: 50px;
+            text-align: center;
+        }
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .overtime {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            .calendar {
+                margin-right: 0;
+                margin-bottom: 20px;
+            }
+            .summary {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="calendar">
+            <div class="navigation">
+                <button id="prevMonth">&lt; Mois précédent</button>
+                <select id="monthSelect"></select>
+                <button id="nextMonth">Mois suivant &gt;</button>
+            </div>
+            <table id="calendarTable">
+                <thead>
+                    <tr>
+                        <th>Lun</th>
+                        <th>Mar</th>
+                        <th>Mer</th>
+                        <th>Jeu</th>
+                        <th>Ven</th>
+                        <th>Sam</th>
+                        <th>Dim</th>
+                    </tr>
+                </thead>
+                <tbody id="calendarBody"></tbody>
+            </table>
+            <div id="monthSummary"></div>
+        </div>
+        <div class="summary">
+            <h2>Résumé hebdomadaire</h2>
+            <div id="weeklySummary"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script>
+        let currentDate = moment();
+        const calendarBody = document.getElementById('calendarBody');
+        const monthSelect = document.getElementById('monthSelect');
+        const weeklySummary = document.getElementById('weeklySummary');
+        const monthSummary = document.getElementById('monthSummary');
+
+        function generateCalendar(date) {
+            const startOfMonth = date.clone().startOf('month');
+            const endOfMonth = date.clone().endOf('month');
+            const startDate = startOfMonth.clone().startOf('week');
+            const endDate = endOfMonth.clone().endOf('week');
+
+            calendarBody.innerHTML = '';
+            let currentWeek = startDate.clone();
+
+            while (currentWeek.isBefore(endDate)) {
+                const weekRow = document.createElement('tr');
+                for (let i = 0; i < 7; i++) {
+                    const cell = document.createElement('td');
+                    const cellDate = currentWeek.clone();
+                    
+                    if (cellDate.month() !== date.month()) {
+                        cell.classList.add(cellDate.isBefore(date) ? 'prev-month' : 'next-month');
+                    }
+                    
+                    cell.textContent = cellDate.date();
+                    
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.min = '0';
+                    input.max = '24';
+                    input.step = '0.5';
+                    input.value = getStoredHours(cellDate) || '';
+                    input.addEventListener('change', (e) => updateHours(cellDate, e.target.value));
+                    cell.appendChild(document.createElement('br'));
+                    cell.appendChild(input);
+                    
+                    weekRow.appendChild(cell);
+                    currentWeek.add(1, 'day');
+                }
+                calendarBody.appendChild(weekRow);
+            }
+
+            updateSummary();
+        }
+
+        function updateMonthSelect() {
+            monthSelect.innerHTML = '';
+            for (let i = 0; i < 12; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = moment().month(i).format('MMMM YYYY');
+                if (i === currentDate.month()) {
+                    option.selected = true;
+                }
+                monthSelect.appendChild(option);
+            }
+        }
+
+        function getStoredHours(date) {
+            const key = date.format('YYYY-MM-DD');
+            return localStorage.getItem(key);
+        }
+
+        function updateHours(date, hours) {
+            const key = date.format('YYYY-MM-DD');
+            localStorage.setItem(key, hours);
+            updateSummary();
+        }
+
+        function updateSummary() {
+            const startOfMonth = currentDate.clone().startOf('month');
+            const endOfMonth = currentDate.clone().endOf('month');
+            let currentWeek = startOfMonth.clone().startOf('week');
+            let weeklyHours = [];
+            let totalOvertime = 0;
+
+            weeklySummary.innerHTML = '';
+
+            while (currentWeek.isBefore(endOfMonth) || currentWeek.isSame(endOfMonth, 'week')) {
+                let weekTotal = 0;
+                let weekDaysInMonth = 0;
+                for (let i = 0; i < 7; i++) {
+                    const hours = parseFloat(getStoredHours(currentWeek) || 0);
+                    if (currentWeek.isSame(currentDate, 'month') || 
+                        (currentWeek.isBefore(currentDate) && currentWeek.week() === startOfMonth.week())) {
+                        weekTotal += hours;
+                        weekDaysInMonth++;
+                    }
+                    currentWeek.add(1, 'day');
+                }
+                
+                if (weekDaysInMonth > 0) {
+                    const overtime = Math.max(0, weekTotal - 35);
+                    totalOvertime += overtime;
+                    
+                    weeklyHours.push({ total: weekTotal, overtime: overtime });
+                    const weekSummary = document.createElement('p');
+                    weekSummary.innerHTML = `Semaine ${weeklyHours.length}: ${weekTotal.toFixed(1)}h <span class="overtime">(+${overtime.toFixed(1)}h supp.)</span>`;
+                    weeklySummary.appendChild(weekSummary);
+                }
+            }
+
+            monthSummary.innerHTML = `<h3>Total des heures supplémentaires : <span class="overtime">${totalOvertime.toFixed(1)}h</span></h3>`;
+        }
+
+        document.getElementById('prevMonth').addEventListener('click', () => {
+            currentDate.subtract(1, 'month');
+            generateCalendar(currentDate);
+            updateMonthSelect();
+        });
+
+        document.getElementById('nextMonth').addEventListener('click', () => {
+            currentDate.add(1, 'month');
+            generateCalendar(currentDate);
+            updateMonthSelect();
+        });
+
+        monthSelect.addEventListener('change', (e) => {
+            currentDate.month(parseInt(e.target.value));
+            generateCalendar(currentDate);
+        });
+
+        updateMonthSelect();
+        generateCalendar(currentDate);
+    </script>
+</body>
+</html>
